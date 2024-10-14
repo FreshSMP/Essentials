@@ -218,18 +218,48 @@ public class EssentialsPlayerListener implements Listener, FakeAccessor, Runnabl
         Bukkit.getOnlinePlayers().forEach(player -> {
             final User user = ess.getUser(player);
 
+            // Check if the user is frozen and prevent movement
+            if (user.isFreeze()) {
+                final Location from = lastPlayerLocations.getOrDefault(player.getUniqueId(), player.getLocation());
+                final Location to = from.clone(); // Ensure the player stays at the same location
+                try {
+                    // Attempt to send the player to a safe destination if needed
+                    PaperLib.teleportAsync(player, LocationUtil.getSafeDestination(ess, to));
+                } catch (final Exception ex) {
+                    PaperLib.teleportAsync(player, to); // If the safe destination fails, teleport them back to the original location
+                }
+                return; // Exit early since the player is frozen
+            }
+
+            // Check for AFK players and freeze if necessary
+            if (user.isAfk() && ess.getSettings().getFreezeAfkPlayers()) {
+                final Location from = lastPlayerLocations.getOrDefault(player.getUniqueId(), player.getLocation());
+                final Location to = from.clone(); // Reset to original position
+                try {
+                    // Prevent movement if they are not allowed to move while AFK
+                    if (player.getAllowFlight()) {
+                        throw new Exception(); // Allow movement if flying
+                    }
+                    PaperLib.teleportAsync(player, LocationUtil.getSafeDestination(ess, to));
+                } catch (final Exception ex) {
+                    PaperLib.teleportAsync(player, to); // Ensure they stay at the original location if anything fails
+                }
+                return; // Exit early since the player is AFK and frozen
+            }
+
+            // Regular movement handling and AFK checks
             final Location from = lastPlayerLocations.getOrDefault(player.getUniqueId(), player.getLocation());
             final Location to = player.getLocation();
 
             if (from.getBlockX() != to.getBlockX() || from.getBlockY() != to.getBlockY() || from.getBlockZ() != to.getBlockZ()) {
-
+                // Handle activity based on movement if the player is AFK or not frozen
                 if (!ess.getSettings().cancelAfkOnMove()) {
                     return;
                 }
 
                 final Location afk = user.getAfkPosition();
                 if (afk == null || !afk.equals(to)) {
-                    user.updateActivityOnMove(true);
+                    user.updateActivityOnMove(true); // Update activity if they move while not AFK
                 }
             }
 
