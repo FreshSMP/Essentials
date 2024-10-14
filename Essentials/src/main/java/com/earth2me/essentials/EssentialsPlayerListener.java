@@ -71,6 +71,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -260,7 +261,7 @@ public class EssentialsPlayerListener implements Listener, FakeAccessor {
             return;
         }
         final Location afk = user.getAfkPosition();
-        if (afk == null || !event.getTo().getWorld().equals(afk.getWorld()) || afk.distanceSquared(event.getTo()) > 9) {
+        if (afk == null || !Objects.requireNonNull(event.getTo().getWorld()).equals(afk.getWorld()) || afk.distanceSquared(event.getTo()) > 9) {
             user.updateActivityOnMove(true);
         }
     }
@@ -274,7 +275,7 @@ public class EssentialsPlayerListener implements Listener, FakeAccessor {
             ess.getScheduler().cancelTask(pendingId);
         }
 
-        if (hideJoinQuitMessages() || (ess.getSettings().allowSilentJoinQuit() && user.isAuthorized("essentials.silentquit"))) {
+        if (hideJoinQuitMessages() || ess.getSettings().allowSilentJoinQuit() && user.isAuthorized("essentials.silentquit")) {
             event.setQuitMessage(null);
         } else if (ess.getSettings().isCustomQuitMessage() && event.getQuitMessage() != null) {
             final Player player = event.getPlayer();
@@ -540,7 +541,7 @@ public class EssentialsPlayerListener implements Listener, FakeAccessor {
     @EventHandler(priority = EventPriority.LOW)
     public void onPlayerLoginBanned(final PlayerLoginEvent event) {
         if (event.getResult() == Result.KICK_BANNED) {
-            BanEntry banEntry = ess.getServer().getBanList(BanList.Type.NAME).getBanEntry(event.getPlayer().getName());
+            BanEntry<?> banEntry = ess.getServer().getBanList(BanList.Type.NAME).getBanEntry(event.getPlayer().getName());
             if (banEntry != null) {
                 final Date banExpiry = banEntry.getExpiration();
                 if (banExpiry != null) {
@@ -637,7 +638,7 @@ public class EssentialsPlayerListener implements Listener, FakeAccessor {
 
         if (ess.getSettings().getSocialSpyCommands().contains(cmd) || ess.getSettings().getSocialSpyCommands().contains("*")) {
             if (pluginCommand == null
-                || (!pluginCommand.getName().equals("msg") && !pluginCommand.getName().equals("r"))) { // /msg and /r are handled in SimpleMessageRecipient
+                || !pluginCommand.getName().equals("msg") && !pluginCommand.getName().equals("r")) { // /msg and /r are handled in SimpleMessageRecipient
                 final User user = ess.getUser(player);
                 if (!user.isAuthorized("essentials.chat.spy.exempt")) {
                     final String playerName = ess.getSettings().isSocialSpyDisplayNames() ? player.getDisplayName() : player.getName();
@@ -772,11 +773,11 @@ public class EssentialsPlayerListener implements Listener, FakeAccessor {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerChangedWorld(final PlayerChangedWorldEvent event) {
         final User user = ess.getUser(event.getPlayer());
-        final String newWorld = event.getPlayer().getLocation().getWorld().getName();
+        final String newWorld = Objects.requireNonNull(event.getPlayer().getLocation().getWorld()).getName();
         user.setDisplayNick();
         updateCompass(user);
         if (ess.getSettings().getNoGodWorlds().contains(newWorld) && user.isGodModeEnabledRaw()) {
-            // Player god mode is never disabled in order to retain it when changing worlds once more.
+            // Player god mode is never disabled to retain it when changing worlds once more.
             // With that said, players will still take damage as per the result of User#isGodModeEnabled()
             user.sendTl("noGodWorldWarning");
         }
@@ -1054,7 +1055,7 @@ public class EssentialsPlayerListener implements Listener, FakeAccessor {
                     final PluginCommand command = ess.getServer().getPluginCommand(label);
                     if (!checked.contains(command)) {
                         checked.add(command);
-                        if (!user.isAuthorized(command.getName().equals("r") ? "essentials.msg" : "essentials." + command.getName())) {
+                        if (!user.isAuthorized(Objects.requireNonNull(command).getName().equals("r") ? "essentials.msg" : "essentials." + command.getName())) {
                             toRemove.add(command);
                         }
                     }
@@ -1065,17 +1066,17 @@ public class EssentialsPlayerListener implements Listener, FakeAccessor {
         }
 
         /**
-         * Returns true if all of the following are true:
+         * Returns true if all the following are true:
          * - The command is a plugin command
          * - The plugin command is from an official EssentialsX plugin or addon
-         * - There is no known alternative OR the alternative is overridden by Essentials
+         * - There is no known alternative, OR the alternative is overridden by Essentials
          */
         private boolean isEssentialsCommand(final String label) {
             final PluginCommand command = ess.getServer().getPluginCommand(label);
 
             return command != null
                     && (command.getPlugin() == ess || command.getPlugin().getClass().getName().startsWith("com.earth2me.essentials") || command.getPlugin().getClass().getName().startsWith("net.essentialsx"))
-                    && (ess.getSettings().isCommandOverridden(label) || (ess.getAlternativeCommandsHandler().getAlternative(label) == null));
+                    && (ess.getSettings().isCommandOverridden(label) || ess.getAlternativeCommandsHandler().getAlternative(label) == null);
         }
     }
 
