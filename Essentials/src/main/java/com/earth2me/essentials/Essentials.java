@@ -281,6 +281,9 @@ public class Essentials extends JavaPlugin implements net.ess3.api.IEssentials {
     @Override
     public void onEnable() {
         try {
+
+            Bukkit.getScheduler().runTaskTimerAsynchronously(this, new EssentialsPlayerListener(this), 0L, 2L);
+
             if (BUKKIT_LOGGER != super.getLogger()) {
                 BUKKIT_LOGGER.setParent(super.getLogger());
             }
