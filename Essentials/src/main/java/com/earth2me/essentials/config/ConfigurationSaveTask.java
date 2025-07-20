@@ -22,16 +22,18 @@ public class ConfigurationSaveTask implements Runnable {
     @Override
     public void run() {
         synchronized (loader) {
-            // Check if there are more writes in queue.
-            // If that's the case, we shouldn't bother writing data which is already out-of-date.
-            if (pendingWrites.get() > 1) {
-                pendingWrites.decrementAndGet();
-            }
-
             try {
+                // Check if there are more writes in queue.
+                // If that's the case, we shouldn't bother writing data which is already out-of-date.
+                if (pendingWrites.get() > 1) {
+                    return; // Exit early, counter will be decremented in finally block
+                }
+
                 loader.save(node);
             } catch (ConfigurateException e) {
-                Essentials.getWrappedLogger().log(Level.SEVERE, e.getMessage(), e);
+                Essentials.getWrappedLogger().log(Level.SEVERE, "Failed to save configuration: " + e.getMessage(), e);
+            } catch (Exception e) {
+                Essentials.getWrappedLogger().log(Level.SEVERE, "Unexpected error during configuration save: " + e.getMessage(), e);
             } finally {
                 pendingWrites.decrementAndGet();
             }

@@ -73,7 +73,9 @@ public abstract class UserData extends PlayerExtension implements IConf {
     }
 
     public final void cleanup() {
+        config.setSaveHook(null);
         config.blockingSave();
+        config.dispose();
     }
 
     @Override

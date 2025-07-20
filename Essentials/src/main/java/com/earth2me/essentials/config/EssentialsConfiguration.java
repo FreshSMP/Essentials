@@ -40,10 +40,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
@@ -52,6 +54,7 @@ import static com.earth2me.essentials.I18n.tlLiteral;
 
 public class EssentialsConfiguration {
     private static final ExecutorService EXECUTOR_SERVICE = Executors.newSingleThreadExecutor();
+    private static final AtomicBoolean EXECUTOR_SHUTDOWN = new AtomicBoolean(false);
     private static final ObjectMapper.Factory MAPPER_FACTORY = ObjectMapper.factoryBuilder()
             .addProcessor(DeleteOnEmpty.class, (data, value) -> new DeleteOnEmptyProcessor())
             .addProcessor(DeleteIfIncomplete.class, (data, value) -> new DeleteIfIncompleteProcessor())
@@ -473,10 +476,43 @@ public class EssentialsConfiguration {
             saveHook.run();
         }
 
+        if (configurationNode == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+
         final CommentedConfigurationNode node = configurationNode.copy();
 
         pendingWrites.incrementAndGet();
 
+        if (EXECUTOR_SHUTDOWN.get()) {
+            pendingWrites.decrementAndGet();
+            try {
+                loader.save(node);
+            } catch (ConfigurateException e) {
+                Essentials.getWrappedLogger().log(Level.SEVERE, e.getMessage(), e);
+            }
+            return CompletableFuture.completedFuture(null);
+        }
+
         return EXECUTOR_SERVICE.submit(new ConfigurationSaveTask(loader, node, pendingWrites));
+    }
+
+    public static void shutdown() {
+        if (EXECUTOR_SHUTDOWN.compareAndSet(false, true)) {
+            EXECUTOR_SERVICE.shutdown();
+            try {
+                if (!EXECUTOR_SERVICE.awaitTermination(5, TimeUnit.SECONDS)) {
+                    EXECUTOR_SERVICE.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                EXECUTOR_SERVICE.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    public void dispose() {
+        this.saveHook = null;
+        this.configurationNode = null;
     }
 }
