@@ -30,8 +30,7 @@ public class Commandtpoffline extends EssentialsCommand {
             }
 
             user.sendTl("teleporting", logout.getWorld().getName(), logout.getBlockX(), logout.getBlockY(), logout.getBlockZ());
-            user.getAsyncTeleport().now(logout, false, PlayerTeleportEvent.TeleportCause.COMMAND, getNewExceptionFuture(user.getSource(), label));
+            user.getAsyncTeleport().nowUnsafe(logout, PlayerTeleportEvent.TeleportCause.COMMAND, getNewExceptionFuture(user.getSource(), label));
         }
     }
 }
-
